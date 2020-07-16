@@ -3,8 +3,6 @@ package com.typesafe.slick.testkit.tests
 import com.typesafe.slick.testkit.util.{AsyncTest, JdbcTestDB}
 import slick.jdbc.{DerbyProfile, PostgresProfile}
 
-import scala.collection.compat._
-
 class InsertTest extends AsyncTest[JdbcTestDB] {
   import tdb.profile.api._
 
