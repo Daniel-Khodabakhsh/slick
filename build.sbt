@@ -1,3 +1,4 @@
+import CompatReportPlugin.autoImport.compatReportMarkdown
 import com.jsuereth.sbtpgp.PgpKeys
 import com.typesafe.tools.mima.core.{MissingClassProblem, ProblemFilters}
 
@@ -11,6 +12,8 @@ val testSampleTestkit = taskKey[Unit]("Run tests in the testkit-example sample a
 
 val cleanCompileTimeTests =
   taskKey[Unit]("Delete files used for compile-time tests which should be recompiled every time.")
+
+val repoKind = settingKey[String]("""Maven repository kind ("snapshots" or "releases")""")
 
 /* Test Configuration for running tests on doc sources */
 val DocTest = config("doctest").extend(Test)
@@ -56,6 +59,13 @@ def scaladocSourceUrl(dir: String) =
 
 def slickGeneralSettings =
   Seq(
+    repoKind := (if (version.value.trim.endsWith("SNAPSHOT")) "snapshots" else "releases"),
+    publishTo :=
+      (repoKind.value match {
+        case "snapshots" => Some("snapshots" at "https://oss.sonatype.org/content/repositories/snapshots")
+        case "releases"  => Some("releases" at "https://oss.sonatype.org/service/local/staging/deploy/maven2")
+      }),
+    publishMavenStyle := true,
     Test / publishArtifact := false,
     pomIncludeRepository := { _ => false },
     makePomConfiguration ~= {
@@ -71,13 +81,19 @@ def slickGeneralSettings =
       "-diagrams", // requires graphviz
       "-groups"
     ),
+    scaladocSourceUrl("slick"),
     logBuffered := false
   )
 
 // set the scala-compiler dependency unless a local scala is in use
 def compilerDependencySetting(config: String) =
   if (sys.props("scala.home.local") != null) Nil else Seq(
-    libraryDependencies += "org.scala-lang" % "scala-compiler" % scalaVersion.value % config
+    libraryDependencies ++= (if (scalaVersion.value.startsWith("2."))
+      Seq(
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % config,
+        "org.scala-lang" % "scala-reflect" % scalaVersion.value % config)
+    else
+      Seq("org.scala-lang" % "scala3-compiler_3" % scalaVersion.value % config))
   )
 
 def extTarget(extName: String): Seq[Setting[File]] =
@@ -124,6 +140,9 @@ lazy val slick =
       name := "Slick",
       description := "Scala Language-Integrated Connection Kit",
       libraryDependencies ++= Dependencies.mainDependencies,
+      libraryDependencies ++=
+        (if (scalaVersion.value.startsWith("2.")) Seq("org.scala-lang" % "scala-reflect" % scalaVersion.value)
+        else Nil),
       scaladocSourceUrl("slick"),
       Compile / doc / scalacOptions ++= Seq(
         "-doc-root-content", "scaladoc-root.txt"
@@ -315,6 +334,7 @@ lazy val root =
       publishLocal := {},
       PgpKeys.publishSigned := {},
       PgpKeys.publishLocalSigned := {},
+      sourceDirectory := file(target.value + "/root-src"),
       // suppress test status output
       test := {},
       testOnly := {},
@@ -351,6 +371,18 @@ lazy val root =
           testSamplePlainSql,
           testSampleMultiDb,
           testSampleTestkit
+        ).value
+      },
+      testAll := {
+        Def.sequential(
+          testkit / Test / test,
+          testkit / DocTest / test,
+          `reactive-streams-tests` / Test / test,
+          slick / Compile / packageDoc,
+          codegen / Compile / packageDoc,
+          hikaricp / Compile / packageDoc,
+          testkit / Compile / packageDoc,
+          slick / Compile / mimaReportBinaryIssues // enable for minor versions
         ).value
       },
       testAll := {
