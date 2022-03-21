@@ -134,6 +134,7 @@ lazy val slick =
     .settings(
       slickGeneralSettings,
       compilerDependencySetting("macro"),
+      compilerDependencySetting("provided"),
       inConfig(MacroConfig)(Defaults.configSettings),
       FMPP.preprocessorSettings,
       extTarget("slick"),
@@ -154,7 +155,6 @@ lazy val slick =
 
       ivyConfigurations += MacroConfig.hide.extend(Compile),
       Compile / unmanagedClasspath ++= (MacroConfig / products).value,
-      libraryDependencies += "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided",
       (Compile / packageSrc / mappings) ++= (MacroConfig / packageSrc / mappings).value,
       (Compile / packageBin / mappings) ++= (MacroConfig / packageBin / mappings).value,
 
